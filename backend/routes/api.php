@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
+    Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
+
     Route::post('auth/register', [AuthController::class, 'register']);
     Route::post('auth/login',    [AuthController::class, 'login']);
     Route::post('invites/{token}/accept', [GroupController::class, 'acceptInvite'])->middleware('auth:sanctum');
