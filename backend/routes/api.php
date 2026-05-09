@@ -11,7 +11,16 @@ use Illuminate\Support\Facades\Route;
 
 // Public auth routes
 Route::prefix('v1')->group(function () {
-    Route::options('{any}', fn () => response()->noContent())->where('any', '.*');
+    Route::options('{any}', function () {
+        $origin = request()->header('Origin', env('FRONTEND_URL', '*'));
+        return response()->noContent(204, [
+            'Access-Control-Allow-Origin' => $origin,
+            'Access-Control-Allow-Credentials' => 'true',
+            'Access-Control-Allow-Methods' => 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+            'Access-Control-Allow-Headers' => request()->header('Access-Control-Request-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin'),
+            'Vary' => 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
+        ]);
+    })->where('any', '.*');
 
     Route::post('auth/register', [AuthController::class, 'register']);
     Route::post('auth/login',    [AuthController::class, 'login']);
