@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "php -v",
+  "buildCommand": "echo \"Skipping build for PHP runtime\"",
   "outputDirectory": ".",
   "functions": {
     "api/index.php": {
