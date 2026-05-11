@@ -2,35 +2,23 @@
   "version": 2,
   "buildCommand": "echo \"Skipping build for PHP runtime\"",
   "outputDirectory": ".",
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://gestao-financeira-front-alpha.vercel.app"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-        }
-      ]
-    }
-  ],
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.7.3"
     }
   },
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "methods": ["OPTIONS"],
+      "status": 204,
+      "headers": {
+        "Access-Control-Allow-Origin": "https://gestao-financeira-front-alpha.vercel.app",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+      }
+    },
     { "src": "/(.*)", "dest": "/api/index.php" }
   ]
 }
