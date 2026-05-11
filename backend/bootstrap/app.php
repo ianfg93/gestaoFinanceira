@@ -5,6 +5,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -24,13 +26,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (Throwable $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
-                return response()->json([
+                return new JsonResponse([
                     'message' => app()->hasDebugModeEnabled()
                         ? $e->getMessage()
                         : 'Internal Server Error',
                 ], 500);
             }
 
-            return null;
+            return new Response('Internal Server Error', 500);
         });
     })->create();
