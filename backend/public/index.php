@@ -13,6 +13,11 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 // Bootstrap Laravel and handle the request...
 /** @var Application $app */
 try {
+    $bootstrapCache = __DIR__.'/../bootstrap/cache';
+    if (!is_dir($bootstrapCache)) {
+        @mkdir($bootstrapCache, 0775, true);
+    }
+
     // Register the Composer autoloader...
     require __DIR__.'/../vendor/autoload.php';
 
