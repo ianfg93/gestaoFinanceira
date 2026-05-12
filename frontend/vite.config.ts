@@ -7,6 +7,20 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(__dirname, './src') },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('ag-grid')) return 'vendor-grid'
+            if (id.includes('apexcharts') || id.includes('vue3-apexcharts')) return 'vendor-charts'
+            if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vendor-vue'
+            return 'vendor'
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

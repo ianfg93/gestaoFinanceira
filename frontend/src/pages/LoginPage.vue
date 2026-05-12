@@ -38,6 +38,7 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { BanknotesIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
+import { currentMonth } from '@/utils/format'
 
 const auth   = useAuthStore()
 const router = useRouter()
@@ -50,7 +51,7 @@ async function submit() {
   loading.value = true
   try {
     await auth.login(form.value.email, form.value.password)
-    router.push('/dashboard')
+    router.push(`/months/${currentMonth()}`)
   } catch (e: any) {
     error.value = e.response?.data?.message ?? 'Erro ao entrar. Verifique suas credenciais.'
   } finally {

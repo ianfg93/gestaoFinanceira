@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, defineAsyncComponent } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ChevronLeftIcon, ChevronRightIcon, TableCellsIcon,
@@ -89,10 +89,11 @@ import { useDashboardStore } from '@/stores/dashboard'
 import { useAuthStore } from '@/stores/auth'
 import { currentMonth as getCurrent, formatMonth, prevMonth, nextMonth } from '@/utils/format'
 import SummaryCard from '@/components/dashboard/SummaryCard.vue'
-import ExpensesByCategory from '@/components/dashboard/ExpensesByCategory.vue'
-import MonthlyEvolution from '@/components/dashboard/MonthlyEvolution.vue'
-import ByResponsible from '@/components/dashboard/ByResponsible.vue'
 import TransactionRow from '@/components/dashboard/TransactionRow.vue'
+
+const ExpensesByCategory = defineAsyncComponent(() => import('@/components/dashboard/ExpensesByCategory.vue'))
+const MonthlyEvolution = defineAsyncComponent(() => import('@/components/dashboard/MonthlyEvolution.vue'))
+const ByResponsible = defineAsyncComponent(() => import('@/components/dashboard/ByResponsible.vue'))
 
 const store    = useDashboardStore()
 const auth     = useAuthStore()

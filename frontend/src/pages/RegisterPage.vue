@@ -50,6 +50,7 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { BanknotesIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
+import { currentMonth } from '@/utils/format'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -62,7 +63,7 @@ async function submit() {
   loading.value = true
   try {
     await auth.register(form.value)
-    router.push('/dashboard')
+    router.push(`/months/${currentMonth()}`)
   } catch (e: any) {
     const errs = e.response?.data?.errors
     error.value = errs ? Object.values(errs).flat().join(' ') : 'Erro ao criar conta.'

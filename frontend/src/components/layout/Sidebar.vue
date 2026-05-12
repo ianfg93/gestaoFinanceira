@@ -23,7 +23,8 @@
 
     <!-- Navigation -->
     <nav class="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-      <NavItem to="/dashboard" :icon="HomeIcon" label="Dashboard" />
+      <NavItem :to="`/months/${currentMonth()}`" :icon="HomeIcon" label="Mês Atual" />
+      <NavItem to="/dashboard" :icon="ChartBarIcon" label="Dashboard" />
       <div class="pt-2 pb-1">
         <span class="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Meses</span>
       </div>
@@ -58,7 +59,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  HomeIcon, CalendarDaysIcon, TagIcon, HashtagIcon,
+  HomeIcon, ChartBarIcon, CalendarDaysIcon, TagIcon, HashtagIcon,
   BellIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, BanknotesIcon
 } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'

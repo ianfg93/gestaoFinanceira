@@ -1,5 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { currentMonth } from '@/utils/format'
+
+function currentMonthPath() {
+  return `/months/${currentMonth()}`
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,7 +15,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/layout/AppLayout.vue'),
       children: [
-        { path: '',           redirect: '/dashboard' },
+        { path: '',           redirect: () => currentMonthPath() },
         { path: 'dashboard',  name: 'dashboard',     component: () => import('@/pages/DashboardPage.vue') },
         { path: 'months/:month', name: 'month',      component: () => import('@/pages/MonthPage.vue') },
         { path: 'categories', name: 'categories',    component: () => import('@/pages/CategoriesPage.vue') },
@@ -19,7 +24,7 @@ const router = createRouter({
         { path: 'settings',   name: 'settings',      component: () => import('@/pages/SettingsPage.vue') },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+    { path: '/:pathMatch(.*)*', redirect: () => currentMonthPath() },
   ],
 })
 
@@ -34,7 +39,7 @@ router.beforeEach(async (to) => {
     }
   }
   if (to.meta.public && auth.isAuthenticated) {
-    return { name: 'dashboard' }
+    return currentMonthPath()
   }
 })
 

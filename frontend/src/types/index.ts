@@ -103,6 +103,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface TransactionFilters {
+  page?: number
   month?: string
   type?: string
   status?: string

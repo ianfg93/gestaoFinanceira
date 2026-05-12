@@ -26,7 +26,7 @@ class TransactionResource extends JsonResource {
             'is_recurring'         => $this->is_recurring,
             'notifications_muted'  => $this->notifications_muted,
             'tags'                 => TagResource::collection($this->whenLoaded('tags')),
-            'attachments_count'    => $this->whenLoaded('attachments', fn() => $this->attachments->count(), 0),
+            'attachments_count'    => (int) ($this->attachments_count ?? 0),
             'created_by'           => $this->created_by,
             'updated_by'           => $this->updated_by,
             'created_at'           => $this->created_at,

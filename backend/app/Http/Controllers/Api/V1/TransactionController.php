@@ -23,7 +23,13 @@ class TransactionController extends Controller {
     public function index(Request $request, Group $group) {
         $query = Transaction::where('group_id', $group->id)
             ->whereNull('deleted_at')
-            ->with(['transactionName', 'category', 'responsible', 'tags']);
+            ->with([
+                'transactionName:id,name',
+                'category:id,name,color',
+                'responsible:id,name,email',
+                'tags:id,name,color',
+            ])
+            ->withCount('attachments');
 
         if ($month = $request->query('month')) {
             $query->where('reference_month', $month);
@@ -44,14 +50,17 @@ class TransactionController extends Controller {
             $query->where('series_id', $seriesId);
         }
         if ($q = $request->query('q')) {
-            $query->whereHas('transactionName', fn($q2) => $q2->where('normalized', 'like', '%' . mb_strtolower($q) . '%'));
+            $needle = '%' . mb_strtolower($q) . '%';
+            $query->join('transaction_names', 'transaction_names.id', '=', 'transactions.transaction_name_id')
+                ->where('transaction_names.normalized', 'like', $needle)
+                ->select('transactions.*');
         }
 
         $sortBy  = in_array($request->query('sort_by'), ['due_date','amount','status','type','created_at']) ? $request->query('sort_by') : 'due_date';
         $sortDir = $request->query('sort_dir', 'asc') === 'desc' ? 'desc' : 'asc';
         $query->orderBy($sortBy, $sortDir);
 
-        $perPage = min((int) $request->query('per_page', 100), 500);
+        $perPage = max(1, min((int) $request->query('per_page', 100), 500));
         $result  = $query->paginate($perPage);
 
         return TransactionResource::collection($result);

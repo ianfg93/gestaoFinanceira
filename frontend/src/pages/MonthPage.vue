@@ -11,17 +11,17 @@
       <div class="flex items-center gap-2 flex-1">
         <div class="relative flex-1 max-w-xs">
           <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input v-model="filters.q" type="text" placeholder="Buscar..." class="input pl-9 py-1.5 text-sm" @input="debouncedLoad" />
+          <input v-model="filters.q" type="text" placeholder="Buscar..." class="input pl-9 py-1.5 text-sm" @input="onSearchInput" />
         </div>
 
-        <select v-model="filters.type" @change="loadData" class="input py-1.5 text-sm w-36">
+        <select v-model="filters.type" @change="onFilterChanged" class="input py-1.5 text-sm w-36">
           <option value="">Todos os tipos</option>
           <option value="expense">Despesas</option>
           <option value="income">Receitas</option>
           <option value="investment">Investimentos</option>
         </select>
 
-        <select v-model="filters.status" @change="loadData" class="input py-1.5 text-sm w-36">
+        <select v-model="filters.status" @change="onFilterChanged" class="input py-1.5 text-sm w-36">
           <option value="">Todos os status</option>
           <option value="pending">Pendente</option>
           <option value="paid">Pago</option>
@@ -73,6 +73,17 @@
     <div class="flex-shrink-0 px-6 py-2 bg-white border-t border-gray-200 flex items-center gap-4 text-xs text-gray-500">
       <span>{{ selectedCount > 0 ? `${selectedCount} selecionados` : '' }}</span>
       <button v-if="selectedCount > 0" @click="deleteSelected" class="text-red-500 hover:underline">Excluir selecionados</button>
+      <div class="ml-auto flex items-center gap-2">
+        <label class="text-gray-500">Por página</label>
+        <select v-model.number="perPage" @change="changePerPage" class="input py-1 text-xs w-20">
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+          <option :value="200">200</option>
+        </select>
+        <button @click="prevPage" :disabled="currentPage <= 1" class="btn-secondary btn-sm disabled:opacity-50">Anterior</button>
+        <span class="min-w-20 text-center">Página {{ currentPage }} / {{ transactionStore.lastPage }}</span>
+        <button @click="nextPage" :disabled="currentPage >= transactionStore.lastPage" class="btn-secondary btn-sm disabled:opacity-50">Próxima</button>
+      </div>
     </div>
   </div>
 
@@ -110,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, toRaw } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, toRaw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AgGridVue } from 'ag-grid-vue3'
 import type { ColDef, GridApi, CellValueChangedEvent, GridReadyEvent } from 'ag-grid-community'
@@ -129,7 +140,7 @@ import { useCategoryStore } from '@/stores/categories'
 import { useTagStore } from '@/stores/tags'
 import api from '@/services/api'
 import { transactionService } from '@/services/transactionService'
-import { formatCurrency, formatDate, formatMonth, prevMonth, nextMonth, STATUS_LABELS, TYPE_LABELS, STATUS_CLASSES } from '@/utils/format'
+import { formatCurrency, formatDate, formatMonth, prevMonth, nextMonth, STATUS_LABELS, TYPE_LABELS } from '@/utils/format'
 import TransactionForm from '@/components/forms/TransactionForm.vue'
 import ScopeModal from '@/components/forms/ScopeModal.vue'
 import SeriesModal from '@/components/forms/SeriesModal.vue'
@@ -151,6 +162,8 @@ const showForm     = ref(false)
 const savingCount  = ref(0)
 const lastSaved    = ref<Date | null>(null)
 const selectedCount = ref(0)
+const currentPage  = ref(1)
+const perPage      = ref(100)
 const pendingEdit   = ref<{ rowId: number; field: string; newValue: any; oldValue: any; data: any } | null>(null)
 const pendingDelete = ref<{
   mode: 'single' | 'bulk'
@@ -175,9 +188,16 @@ function nextM() { router.push(`/months/${nextMonth(month.value)}`) }
 
 const totals = computed(() => {
   const items = transactionStore.items
-  const income     = items.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const expense    = items.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-  const investment = items.filter(t => t.type === 'investment').reduce((s, t) => s + t.amount, 0)
+  let income = 0
+  let expense = 0
+  let investment = 0
+
+  for (const t of items) {
+    if (t.type === 'income') income += t.amount
+    else if (t.type === 'expense') expense += t.amount
+    else if (t.type === 'investment') investment += t.amount
+  }
+
   return { income, expense, investment, balance: income - expense - investment }
 })
 
@@ -192,7 +212,6 @@ const rowSelection: any = { mode: 'multiRow', checkboxes: true, headerCheckbox: 
 
 const columnDefs = computed<ColDef[]>(() => {
   const cats    = categoryStore.flat()
-  const members = authStore.groups.find(g => g.id === authStore.currentGroup?.id)
 
   return [
     {
@@ -360,6 +379,12 @@ function onSelectionChanged() {
 
 function onGridReady(p: GridReadyEvent) {
   gridApi.value = p.api
+  const gid = authStore.currentGroup?.id
+  if (gid) {
+    categoryStore.load(gid)
+    tagStore.load(gid)
+    api.get(`/groups/${gid}/members`).then(res => { groupMembers.value = res.data }).catch(() => {})
+  }
   loadData()
 }
 
@@ -482,6 +507,10 @@ onMounted(() => {
   document.querySelector('.ag-theme-alpine')?.addEventListener('click', handleGridClick as EventListener)
 })
 
+onUnmounted(() => {
+  document.querySelector('.ag-theme-alpine')?.removeEventListener('click', handleGridClick as EventListener)
+})
+
 async function confirmDelete(id: number) {
   const t = transactionStore.items.find(i => i.id === id)
   if (!t) return
@@ -547,6 +576,7 @@ async function onDeleteModalConfirm(scope: 'this' | 'future' | 'all') {
   pendingDelete.value = null
   toast.success(`${bulkNodes.length} registro(s) excluido(s)`)
   selectedCount.value = 0
+  await loadData()
 }
 
 async function loadData() {
@@ -557,12 +587,42 @@ async function loadData() {
     type:   filters.value.type   || undefined,
     status: filters.value.status || undefined,
     q:      filters.value.q      || undefined,
+    page: currentPage.value,
+    per_page: perPage.value,
   })
   // Alimenta o grid com dados sem binding reativo (evita loop)
   gridApi.value.setGridOption('rowData', toRaw(transactionStore.items))
+  currentPage.value = transactionStore.currentPage
 }
 
 const debouncedLoad = useDebounceFn(loadData, 400)
+
+function onSearchInput() {
+  currentPage.value = 1
+  debouncedLoad()
+}
+
+function onFilterChanged() {
+  currentPage.value = 1
+  loadData()
+}
+
+function prevPage() {
+  if (currentPage.value <= 1) return
+  currentPage.value--
+  loadData()
+}
+
+function nextPage() {
+  if (currentPage.value >= transactionStore.lastPage) return
+  currentPage.value++
+  loadData()
+}
+
+function changePerPage() {
+  currentPage.value = 1
+  loadData()
+}
 
 function onCreated() {
   showForm.value = false
@@ -571,20 +631,12 @@ function onCreated() {
 }
 
 watch(() => authStore.currentGroup?.id, (gid) => {
+  currentPage.value = 1
   loadData()
-  if (gid) {
-    api.get(`/groups/${gid}/members`).then(res => { groupMembers.value = res.data }).catch(() => {})
-  }
-})
-onMounted(() => {
-  const gid = authStore.currentGroup?.id
   if (gid) {
     categoryStore.load(gid)
     tagStore.load(gid)
-    loadData()
-    api.get(`/groups/${gid}/members`).then(res => {
-      groupMembers.value = res.data
-    }).catch(() => {})
+    api.get(`/groups/${gid}/members`).then(res => { groupMembers.value = res.data }).catch(() => {})
   }
 })
 </script>

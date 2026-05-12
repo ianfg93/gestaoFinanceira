@@ -7,24 +7,36 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService {
+    private function cacheVersion(Group $group): int {
+        return (int) Cache::get("dashboard.version.{$group->id}", 1);
+    }
+
     public function monthly(Group $group, string $month): array {
-        $cacheKey = "dashboard.{$group->id}.{$month}";
+        $version = $this->cacheVersion($group);
+        $cacheKey = "dashboard.{$group->id}.v{$version}.{$month}";
 
         return Cache::remember($cacheKey, 300, function () use ($group, $month) {
-            $base = fn() => Transaction::where('group_id', $group->id)
+            $base = fn() => Transaction::query()
+                ->from('transactions')
                 ->where('reference_month', $month)
+                ->where('group_id', $group->id)
                 ->whereNull('deleted_at');
 
-            $income     = $base()->where('type', 'income')->sum('amount');
-            $expense    = $base()->where('type', 'expense')->sum('amount');
-            $investment = $base()->where('type', 'investment')->sum('amount');
+            $totalsByType = $base()
+                ->select('type', DB::raw('sum(amount) as total'))
+                ->groupBy('type')
+                ->pluck('total', 'type');
+
+            $income = (float) ($totalsByType['income'] ?? 0);
+            $expense = (float) ($totalsByType['expense'] ?? 0);
+            $investment = (float) ($totalsByType['investment'] ?? 0);
 
             return [
                 'month'   => $month,
                 'totals'  => [
-                    'income'     => (float) $income,
-                    'expense'    => (float) $expense,
-                    'investment' => (float) $investment,
+                    'income'     => $income,
+                    'expense'    => $expense,
+                    'investment' => $investment,
                     'balance'    => (float) ($income - $expense - $investment),
                 ],
                 'by_status' => $base()
@@ -70,19 +82,24 @@ class DashboardService {
     }
 
     public function monthlyEvolution(Group $group, string $fromMonth, string $toMonth): array {
-        return Transaction::where('group_id', $group->id)
-            ->whereBetween('reference_month', [$fromMonth, $toMonth])
-            ->whereNull('deleted_at')
-            ->select('reference_month', 'type', DB::raw('sum(amount) as total'))
-            ->groupBy('reference_month', 'type')
-            ->orderBy('reference_month')
-            ->get()
-            ->groupBy('reference_month')
-            ->map(fn($items) => $items->keyBy('type'))
-            ->toArray();
+        $version = $this->cacheVersion($group);
+        $cacheKey = "dashboard.evolution.{$group->id}.v{$version}.{$fromMonth}.{$toMonth}";
+
+        return Cache::remember($cacheKey, 300, function () use ($group, $fromMonth, $toMonth) {
+            return Transaction::where('group_id', $group->id)
+                ->whereBetween('reference_month', [$fromMonth, $toMonth])
+                ->whereNull('deleted_at')
+                ->select('reference_month', 'type', DB::raw('sum(amount) as total'))
+                ->groupBy('reference_month', 'type')
+                ->orderBy('reference_month')
+                ->get()
+                ->groupBy('reference_month')
+                ->map(fn($items) => $items->keyBy('type'))
+                ->toArray();
+        });
     }
 
     public function invalidate(Group $group, string $month): void {
-        Cache::forget("dashboard.{$group->id}.{$month}");
+        Cache::increment("dashboard.version.{$group->id}");
     }
 }
