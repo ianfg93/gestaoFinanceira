@@ -1,15 +1,12 @@
 import axios from 'axios'
 
 const envApiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
-const productionFallbackApiBase = 'https://gestao-financeira-back.vercel.app'
-
-// Fallback em produção para garantir API funcional mesmo sem rewrite no frontend.
-const API_BASE = import.meta.env.PROD
-  ? (envApiBase || productionFallbackApiBase)
-  : envApiBase
 
 const api = axios.create({
-  baseURL: API_BASE ? `${API_BASE}/v1` : '/api/v1',
+  // Em producao, usa sempre o rewrite /api do frontend para evitar quebra por URL de preview.
+  baseURL: import.meta.env.PROD
+    ? '/api/v1'
+    : (envApiBase ? `${envApiBase}/v1` : '/api/v1'),
   withCredentials: false,
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
 })
