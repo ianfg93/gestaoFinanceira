@@ -1,11 +1,12 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 
 const envApiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+const canonicalProdApiBase = 'https://gestao-financeira-back.vercel.app'
 
 const api = axios.create({
-  // Em producao, usa sempre o rewrite /api do frontend para evitar quebra por URL de preview.
+  // Em produção, usa backend canônico direto para não depender de rewrite /api do frontend.
   baseURL: import.meta.env.PROD
-    ? '/api/v1'
+    ? `${canonicalProdApiBase}/v1`
     : (envApiBase ? `${envApiBase}/v1` : '/api/v1'),
   withCredentials: false,
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
