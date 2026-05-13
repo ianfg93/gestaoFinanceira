@@ -90,9 +90,26 @@ class GroupController extends Controller {
     }
 
     public function updateMember(Request $request, Group $group, User $user) {
-        $data = $request->validate(['role' => 'required|in:editor,viewer,admin']);
-        $group->members()->updateExistingPivot($user->id, ['role' => $data['role']]);
-        return response()->json(['message' => 'Role updated']);
+        abort_unless($group->members()->where('user_id', $user->id)->exists(), 404, 'Member not found in this group');
+
+        $data = $request->validate([
+            'name' => 'sometimes|string|max:150',
+            'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
+            'password' => 'nullable|string|min:8|max:255',
+            'role' => 'sometimes|in:editor,viewer,admin',
+        ]);
+
+        $userData = [];
+        if (array_key_exists('name', $data)) $userData['name'] = $data['name'];
+        if (array_key_exists('email', $data)) $userData['email'] = $data['email'];
+        if (!empty($data['password'])) $userData['password'] = $data['password'];
+        if (!empty($userData)) $user->update($userData);
+
+        if (array_key_exists('role', $data)) {
+            $group->members()->updateExistingPivot($user->id, ['role' => $data['role']]);
+        }
+
+        return response()->json(['message' => 'Member updated']);
     }
 
     public function removeMember(Group $group, User $user) {

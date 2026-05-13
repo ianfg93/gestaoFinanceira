@@ -13,4 +13,8 @@ export const groupService = {
     const res = await api.post(`/groups/${groupId}/invite`, { email, role })
     return res.data
   },
+  async updateMember(groupId: number, userId: number, payload: { name?: string; email?: string; password?: string; role?: 'admin' | 'editor' | 'viewer' }) {
+    const res = await api.patch(`/groups/${groupId}/members/${userId}`, payload)
+    return res.data
+  },
 }

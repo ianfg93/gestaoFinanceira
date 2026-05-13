@@ -5,6 +5,7 @@ use App\Domain\Notifications\Services\NotificationService;
 use App\Models\FinancialNotification;
 use App\Models\Transaction;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Mail;
 
 class SendDueTomorrowNotifications extends Command {
     protected $signature   = 'notify:due-tomorrow';
@@ -40,6 +41,16 @@ class SendDueTomorrowNotifications extends Command {
                             'body'           => 'R$ ' . number_format($transaction->amount, 2, ',', '.'),
                             'action_url'     => "/months/{$transaction->reference_month}",
                         ]);
+
+                        if (config('services.notifications.email_enabled')) {
+                            Mail::raw(
+                                "A conta '{$transaction->transactionName->name}' vence amanha.\nValor: R$ " . number_format($transaction->amount, 2, ',', '.') . "\nAcesse: /months/{$transaction->reference_month}",
+                                function ($message) use ($user, $transaction) {
+                                    $message->to($user->email, $user->name)
+                                        ->subject("Conta vence amanha: {$transaction->transactionName->name}");
+                                }
+                            );
+                        }
 
                         $this->notificationService->logSent($user, $transaction, 'due_tomorrow');
                     }

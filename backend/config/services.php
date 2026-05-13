@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'notifications' => [
+        'email_enabled' => env('EMAIL_NOTIFICATIONS_ENABLED', false),
+        'email_user' => env('EMAIL_USER'),
+        'email_pass' => env('EMAIL_PASS'),
+    ],
+
 ];
