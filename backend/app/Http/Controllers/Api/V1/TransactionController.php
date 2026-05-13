@@ -26,8 +26,7 @@ class TransactionController extends Controller {
             ->with([
                 'transactionName:id,name',
                 'category:id,name,color',
-                'responsible:id,name,email',
-                'tags:id,name,color',
+                'responsible:id,name',
             ])
             ->withCount('attachments');
 

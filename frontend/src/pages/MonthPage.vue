@@ -53,7 +53,7 @@
     </div>
 
     <!-- AG Grid -->
-    <div class="flex-1 overflow-hidden">
+    <div class="flex-1 overflow-hidden relative">
       <AgGridVue
         class="ag-theme-alpine w-full h-full"
         :columnDefs="columnDefs"
@@ -67,6 +67,24 @@
         @grid-ready="onGridReady"
         @selection-changed="onSelectionChanged"
       />
+
+      <div
+        v-if="showBlockingGridLoading"
+        class="absolute inset-0 bg-white/75 backdrop-blur-[1px] flex items-center justify-center z-10"
+      >
+        <div class="flex items-center gap-3 text-sm text-gray-600">
+          <span class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+          <span>Carregando registros...</span>
+        </div>
+      </div>
+
+      <div
+        v-else-if="transactionStore.loading"
+        class="absolute top-2 right-2 z-10 bg-white/90 border border-gray-200 rounded-full px-2 py-1 text-xs text-gray-600 flex items-center gap-1"
+      >
+        <span class="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+        <span>Atualizando</span>
+      </div>
     </div>
 
     <!-- Footer totals -->
@@ -178,6 +196,9 @@ const pendingDelete = ref<{
 const viewingSeries = ref<{ seriesId: number } | null>(null)
 const gridApi        = ref<GridApi | null>(null)
 const groupMembers   = ref<{ id: number; name: string }[]>([])
+const loadedContextGroupId = ref<number | null>(null)
+const showBlockingGridLoading = computed(() => transactionStore.loading && transactionStore.items.length === 0)
+let loadSeq = 0
 
 const filters = ref({ q: '', type: '', status: '' })
 
@@ -377,15 +398,29 @@ function onSelectionChanged() {
   selectedCount.value = gridApi.value?.getSelectedNodes().length ?? 0
 }
 
-function onGridReady(p: GridReadyEvent) {
+async function onGridReady(p: GridReadyEvent) {
   gridApi.value = p.api
   const gid = authStore.currentGroup?.id
   if (gid) {
-    categoryStore.load(gid)
-    tagStore.load(gid)
-    api.get(`/groups/${gid}/members`).then(res => { groupMembers.value = res.data }).catch(() => {})
+    await ensureGroupContext(gid)
   }
-  loadData()
+  await loadData()
+}
+
+async function ensureGroupContext(groupId: number) {
+  if (loadedContextGroupId.value === groupId) return
+
+  loadedContextGroupId.value = groupId
+  try {
+    const [membersRes] = await Promise.all([
+      api.get(`/groups/${groupId}/members`),
+      categoryStore.load(groupId),
+      tagStore.load(groupId),
+    ])
+    groupMembers.value = membersRes.data
+  } catch {
+    groupMembers.value = []
+  }
 }
 
 // Per-cell lock: prevents duplicate saves from spurious re-fires
@@ -582,7 +617,9 @@ async function onDeleteModalConfirm(scope: 'this' | 'future' | 'all') {
 async function loadData() {
   const groupId = authStore.currentGroup?.id
   if (!groupId || !gridApi.value) return
-  await transactionStore.load(groupId, {
+
+  const seq = ++loadSeq
+  const loadPromise = transactionStore.load(groupId, {
     month:  month.value,
     type:   filters.value.type   || undefined,
     status: filters.value.status || undefined,
@@ -590,6 +627,13 @@ async function loadData() {
     page: currentPage.value,
     per_page: perPage.value,
   })
+
+  // Immediate paint from cached data when available.
+  gridApi.value.setGridOption('rowData', toRaw(transactionStore.items))
+
+  await loadPromise
+  if (seq !== loadSeq) return
+
   // Alimenta o grid com dados sem binding reativo (evita loop)
   gridApi.value.setGridOption('rowData', toRaw(transactionStore.items))
   currentPage.value = transactionStore.currentPage
@@ -630,13 +674,10 @@ function onCreated() {
   toast.success('Criado com sucesso!')
 }
 
-watch(() => authStore.currentGroup?.id, (gid) => {
+watch(() => authStore.currentGroup?.id, async (gid) => {
   currentPage.value = 1
-  loadData()
-  if (gid) {
-    categoryStore.load(gid)
-    tagStore.load(gid)
-    api.get(`/groups/${gid}/members`).then(res => { groupMembers.value = res.data }).catch(() => {})
-  }
+  if (!gid) return
+  await ensureGroupContext(gid)
+  await loadData()
 })
 </script>

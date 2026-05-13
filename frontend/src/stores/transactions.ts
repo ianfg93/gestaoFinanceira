@@ -10,7 +10,10 @@ export const useTransactionStore = defineStore('transactions', () => {
   const lastPage   = ref(1)
   const currentPage = ref(1)
   let lastRequestId = 0
-  const cache = new Map<string, { data: Transaction[]; total: number; lastPage: number; currentPage: number }>()
+  type CachePayload = { data: Transaction[]; total: number; lastPage: number; currentPage: number }
+  const cache = new Map<string, CachePayload>()
+  const inFlight = new Map<string, Promise<CachePayload>>()
+  let lastLoadedKey = ''
 
   function buildCacheKey(groupId: number, filters: TransactionFilters) {
     const normalized = Object.entries(filters)
@@ -21,34 +24,55 @@ export const useTransactionStore = defineStore('transactions', () => {
     return `${groupId}|${normalized}`
   }
 
-  function setFromPayload(payload: { data: Transaction[]; total: number; lastPage: number; currentPage: number }) {
+  function setFromPayload(payload: CachePayload) {
     items.value = payload.data
     total.value = payload.total
     lastPage.value = payload.lastPage
     currentPage.value = payload.currentPage
   }
 
-  async function load(groupId: number, filters: TransactionFilters) {
-    const requestId = ++lastRequestId
+  async function load(groupId: number, filters: TransactionFilters, options?: { force?: boolean }) {
     const key = buildCacheKey(groupId, filters)
     const cached = cache.get(key)
+
     if (cached) {
       setFromPayload(cached)
     }
 
+    // Same query already loaded and cached: avoid redundant request.
+    if (cached && key === lastLoadedKey && !options?.force) {
+      loading.value = false
+      return
+    }
+
+    // If same query is already being fetched, reuse that request.
+    if (inFlight.has(key)) {
+      const payload = await inFlight.get(key)!
+      setFromPayload(payload)
+      return
+    }
+
+    const requestId = ++lastRequestId
     loading.value = true
-    try {
+    const request = (async (): Promise<CachePayload> => {
       const res = await transactionService.list(groupId, filters)
-      if (requestId !== lastRequestId) return
-      const payload = {
+      return {
         data: res.data,
         total: res.meta.total,
         lastPage: res.meta.last_page,
         currentPage: res.meta.current_page,
       }
+    })()
+    inFlight.set(key, request)
+
+    try {
+      const payload = await request
+      if (requestId !== lastRequestId) return
       cache.set(key, payload)
+      lastLoadedKey = key
       setFromPayload(payload)
     } finally {
+      inFlight.delete(key)
       if (requestId === lastRequestId) {
         loading.value = false
       }
