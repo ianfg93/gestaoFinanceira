@@ -19,7 +19,26 @@ if (!is_dir($bootstrapCache)) {
 }
 
 // Register the Composer autoloader...
-require __DIR__.'/../vendor/autoload.php';
+$autoloadPaths = [
+    __DIR__.'/../vendor/autoload.php',
+    __DIR__.'/../../vendor/autoload.php',
+];
+
+$autoloadFile = null;
+foreach ($autoloadPaths as $candidate) {
+    if (file_exists($candidate)) {
+        $autoloadFile = $candidate;
+        break;
+    }
+}
+
+if (!$autoloadFile) {
+    http_response_code(500);
+    echo 'Composer autoload not found. Expected one of: ' . implode(', ', $autoloadPaths);
+    exit(1);
+}
+
+require $autoloadFile;
 
 $app = require_once __DIR__.'/../bootstrap/app.php';
 $app->handleRequest(Request::capture());
