@@ -8,33 +8,6 @@
       "runtime": "vercel-php@0.7.3"
     }
   },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://gestao-financeira-front-alpha.vercel.app"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, X-Requested-With, Accept, Origin"
-        },
-        {
-          "key": "Vary",
-          "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
-        }
-      ]
-    }
-  ],
   "rewrites": [
     {
       "source": "/(.*)",
