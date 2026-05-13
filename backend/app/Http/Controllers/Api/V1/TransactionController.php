@@ -5,6 +5,7 @@ use App\Domain\Dashboard\Services\DashboardService;
 use App\Domain\Transactions\Actions\CreateTransactionAction;
 use App\Domain\Transactions\Actions\UpdateTransactionAction;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TransactionListResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\Group;
 use App\Models\Transaction;
@@ -23,6 +24,29 @@ class TransactionController extends Controller {
     public function index(Request $request, Group $group) {
         $query = Transaction::where('group_id', $group->id)
             ->whereNull('deleted_at')
+            ->select([
+                'id',
+                'group_id',
+                'series_id',
+                'installment_number',
+                'total_installments',
+                'type',
+                'transaction_name_id',
+                'category_id',
+                'amount',
+                'status',
+                'due_date',
+                'paid_date',
+                'reference_month',
+                'responsible_id',
+                'notes',
+                'is_recurring',
+                'notifications_muted',
+                'created_by',
+                'updated_by',
+                'created_at',
+                'updated_at',
+            ])
             ->with([
                 'transactionName:id,name',
                 'category:id,name,color',
@@ -62,7 +86,7 @@ class TransactionController extends Controller {
         $perPage = max(1, min((int) $request->query('per_page', 100), 500));
         $result  = $query->paginate($perPage);
 
-        return TransactionResource::collection($result);
+        return TransactionListResource::collection($result);
     }
 
     public function store(Request $request, Group $group) {

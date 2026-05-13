@@ -92,15 +92,15 @@
       <span>{{ selectedCount > 0 ? `${selectedCount} selecionados` : '' }}</span>
       <button v-if="selectedCount > 0" @click="deleteSelected" class="text-red-500 hover:underline">Excluir selecionados</button>
       <div class="ml-auto flex items-center gap-2">
-        <label class="text-gray-500">Por página</label>
+        <label class="text-gray-500">Por p&aacute;gina</label>
         <select v-model.number="perPage" @change="changePerPage" class="input py-1 text-xs w-20">
           <option :value="50">50</option>
           <option :value="100">100</option>
           <option :value="200">200</option>
         </select>
         <button @click="prevPage" :disabled="currentPage <= 1" class="btn-secondary btn-sm disabled:opacity-50">Anterior</button>
-        <span class="min-w-20 text-center">Página {{ currentPage }} / {{ transactionStore.lastPage }}</span>
-        <button @click="nextPage" :disabled="currentPage >= transactionStore.lastPage" class="btn-secondary btn-sm disabled:opacity-50">Próxima</button>
+        <span class="min-w-20 text-center">P&aacute;gina {{ currentPage }} / {{ transactionStore.lastPage }}</span>
+        <button @click="nextPage" :disabled="currentPage >= transactionStore.lastPage" class="btn-secondary btn-sm disabled:opacity-50">Pr&oacute;xima</button>
       </div>
     </div>
   </div>
@@ -197,15 +197,32 @@ const viewingSeries = ref<{ seriesId: number } | null>(null)
 const gridApi        = ref<GridApi | null>(null)
 const groupMembers   = ref<{ id: number; name: string }[]>([])
 const loadedContextGroupId = ref<number | null>(null)
-const showBlockingGridLoading = computed(() => transactionStore.loading && transactionStore.items.length === 0)
+const monthSwitching = ref(false)
+const showBlockingGridLoading = computed(() =>
+  transactionStore.loading && (transactionStore.items.length === 0 || monthSwitching.value)
+)
 let loadSeq = 0
 
 const filters = ref({ q: '', type: '', status: '' })
 
-watch(() => route.params.month, (m) => { month.value = m as string; loadData() })
+watch(() => route.params.month, (m) => {
+  const nextMonthParam = m as string
+  if (!nextMonthParam || nextMonthParam === month.value) return
+  month.value = nextMonthParam
+  currentPage.value = 1
+  monthSwitching.value = true
+  loadData()
+})
 
-function prevM() { router.push(`/months/${prevMonth(month.value)}`) }
-function nextM() { router.push(`/months/${nextMonth(month.value)}`) }
+function prevM() {
+  monthSwitching.value = true
+  router.push(`/months/${prevMonth(month.value)}`)
+}
+
+function nextM() {
+  monthSwitching.value = true
+  router.push(`/months/${nextMonth(month.value)}`)
+}
 
 const totals = computed(() => {
   const items = transactionStore.items
@@ -619,24 +636,55 @@ async function loadData() {
   if (!groupId || !gridApi.value) return
 
   const seq = ++loadSeq
-  const loadPromise = transactionStore.load(groupId, {
+  const query = {
     month:  month.value,
     type:   filters.value.type   || undefined,
     status: filters.value.status || undefined,
     q:      filters.value.q      || undefined,
     page: currentPage.value,
     per_page: perPage.value,
-  })
+  }
+  const hasCachedData = transactionStore.hasCache(groupId, query)
+  const shouldBlockForMonthSwitch = monthSwitching.value && !hasCachedData
+  const loadPromise = transactionStore.load(groupId, query)
 
-  // Immediate paint from cached data when available.
-  gridApi.value.setGridOption('rowData', toRaw(transactionStore.items))
+  if (shouldBlockForMonthSwitch) {
+    gridApi.value.setGridOption('rowData', [])
+  } else {
+    // Immediate paint from cached data when available.
+    gridApi.value.setGridOption('rowData', toRaw(transactionStore.items))
+  }
 
   await loadPromise
   if (seq !== loadSeq) return
 
-  // Alimenta o grid com dados sem binding reativo (evita loop)
+  // Alimenta o grid com dados sem binding reativo (evita loop).
   gridApi.value.setGridOption('rowData', toRaw(transactionStore.items))
   currentPage.value = transactionStore.currentPage
+  monthSwitching.value = false
+  prefetchNeighborMonths(groupId)
+}
+
+function prefetchNeighborMonths(groupId: number) {
+  if (filters.value.q || filters.value.type || filters.value.status) return
+  if (currentPage.value !== 1) return
+
+  const sharedFilters = {
+    type: undefined,
+    status: undefined,
+    q: undefined,
+    page: 1,
+    per_page: perPage.value,
+  }
+
+  for (const targetMonth of [prevMonth(month.value), nextMonth(month.value)]) {
+    void transactionStore.prefetch(groupId, {
+      month: targetMonth,
+      ...sharedFilters,
+    }).catch(() => {
+      // Best effort only: keep UX snappy without surfacing noise.
+    })
+  }
 }
 
 const debouncedLoad = useDebounceFn(loadData, 400)

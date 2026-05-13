@@ -31,6 +31,11 @@ export const useTransactionStore = defineStore('transactions', () => {
     currentPage.value = payload.currentPage
   }
 
+  function hasCache(groupId: number, filters: TransactionFilters) {
+    const key = buildCacheKey(groupId, filters)
+    return cache.has(key)
+  }
+
   async function load(groupId: number, filters: TransactionFilters, options?: { force?: boolean }) {
     const key = buildCacheKey(groupId, filters)
     const cached = cache.get(key)
@@ -79,6 +84,29 @@ export const useTransactionStore = defineStore('transactions', () => {
     }
   }
 
+  async function prefetch(groupId: number, filters: TransactionFilters) {
+    const key = buildCacheKey(groupId, filters)
+    if (cache.has(key) || inFlight.has(key)) return
+
+    const request = (async (): Promise<CachePayload> => {
+      const res = await transactionService.list(groupId, filters)
+      return {
+        data: res.data,
+        total: res.meta.total,
+        lastPage: res.meta.last_page,
+        currentPage: res.meta.current_page,
+      }
+    })()
+
+    inFlight.set(key, request)
+    try {
+      const payload = await request
+      cache.set(key, payload)
+    } finally {
+      inFlight.delete(key)
+    }
+  }
+
   async function create(groupId: number, data: Partial<Transaction> & { name: string }) {
     const t = await transactionService.create(groupId, data)
     cache.clear()
@@ -102,5 +130,5 @@ export const useTransactionStore = defineStore('transactions', () => {
     }
   }
 
-  return { items, loading, total, lastPage, currentPage, load, create, update, remove }
+  return { items, loading, total, lastPage, currentPage, hasCache, load, prefetch, create, update, remove }
 })
